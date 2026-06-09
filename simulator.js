@@ -4,11 +4,7 @@
 // Constants
 // ─────────────────────────────────────────────
 
-const MODELS = [
-    { name: 'NetCore GS-2400',  ports: 24, hasPoe: false, speed: '1G' },
-    { name: 'NetCore GS-4824',  ports: 24, hasPoe: false, speed: '10G' },
-    { name: 'NetCore PoE-2424', ports: 24, hasPoe: true,  speed: '1G' },
-];
+const MODEL = { name: 'NetCore GS-2424P', ports: 24, hasPoe: true, speed: '1G' };
 
 const FAULTS = [
     { id: 'FAN_WARN',    name: '風扇轉速異常',         severity: 'WARNING', led: 'FAN',  color: 'amber' },
@@ -43,7 +39,7 @@ class NetworkSwitch {
     constructor(id) {
         this.id    = id;
         this.name  = `SW-${String(id).padStart(2, '0')}`;
-        this.model = MODELS[(id - 1) % MODELS.length];
+        this.model = MODEL;
         this.state = 'OFFLINE';  // OFFLINE | BOOTING | NORMAL | WARNING | FAULT | RESETTING
 
         this.uptime  = 0;
