@@ -176,37 +176,57 @@ header h1 {
 /* Front panel */
 .switch-front {
     background: var(--sw-front);
-    padding: 5px 8px;
+    padding: 6px 10px;
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 54px;
+    gap: 10px;
+    min-height: 76px;
     border-bottom: 1px solid #111;
 }
 .switch-unit.state-offline .switch-front { background: #141618; }
 
-.sw-label { min-width: 110px; }
+.sw-label { min-width: 100px; flex-shrink: 0; }
 .sw-name  { font-size: 10px; font-weight: bold; color: #8899aa; }
-.sw-model { font-size: 8px;  color: #444d5a; margin-top: 2px; }
+.sw-model { font-size: 8px;  color: #444d5a; margin-top: 3px; line-height: 1.5; }
 
-/* System LEDs column */
+/* System LEDs — horizontal row of indicator groups */
 .sys-leds {
-    display: grid;
-    grid-template-columns: auto auto;
-    gap: 2px 6px;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
     align-items: center;
+    padding: 0 10px;
+    border-left:  1px solid #1e2228;
+    border-right: 1px solid #1e2228;
+    flex-shrink: 0;
 }
-.led-row { display: contents; }
-.led-tag {
-    font-size: 7px;
-    color: #3a4050;
-    text-align: right;
+
+/* One LED indicator: dot + abbr + desc stacked vertically */
+.led-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 34px;
+}
+.led-name {
+    font-size: 8px;
+    font-weight: bold;
+    color: #4a5668;
     letter-spacing: .5px;
+    text-transform: uppercase;
+}
+.led-desc {
+    font-size: 7px;
+    color: #2e3848;
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1.2;
 }
 
 /* LED dot */
 .led {
-    width: 9px; height: 9px;
+    width: 12px; height: 12px;
     border-radius: 50%;
     background: var(--dim);
     border: 1px solid #111;
@@ -247,17 +267,22 @@ header h1 {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
+    min-width: 0;
 }
-.port-row { display: flex; gap: 2px; }
+.port-row { display: flex; gap: 3px; }
+
+/* Visual gap every 4 ports (positions 5 and 9 in each 12-port row) */
+.port:nth-child(4n+1):not(:first-child) { margin-left: 5px; }
 
 .port {
-    width: 13px; height: 18px;
+    width: 15px; height: 22px;
     border-radius: 2px;
     background: #0d0f12;
     border: 1px solid #111;
     cursor: help;
     transition: background .15s;
+    flex-shrink: 0;
 }
 .port.up       { background: #006630; box-shadow: inset 0 0 4px #009944; }
 .port.active   { animation: portBlink .15s infinite; }
@@ -273,31 +298,6 @@ header h1 {
     0%,100% { background:#00cc33; box-shadow:inset 0 0 4px #00cc33; }
     50%      { background:#0d0f12; box-shadow:none; }
 }
-
-/* MGMT / Console */
-.mgmt-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    min-width: 38px;
-}
-.mgmt-jack {
-    width: 16px; height: 11px;
-    background: #0a0c0f;
-    border: 1px solid #333;
-    border-radius: 1px;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.mgmt-jack .led {
-    width: 5px; height: 5px;
-    position: absolute;
-    top: -4px; right: -4px;
-}
-.mgmt-tag { font-size: 7px; color: #2e3540; letter-spacing: .3px; }
 
 /* Reset button */
 .reset-btn {
@@ -358,3 +358,24 @@ header h1 {
 .st-info .warn-t  { color: #ffaa44; }
 .st-info .ok      { color: #44aa66; }
 .st-uptime { color: #2e3540; white-space: nowrap; }
+
+/* ── RWD ── */
+@media (max-width: 1100px) {
+    .sys-leds { gap: 6px; padding: 0 6px; }
+    .led-group { min-width: 28px; }
+    .led-desc  { font-size: 6.5px; }
+}
+
+@media (max-width: 860px) {
+    .switch-front { flex-wrap: wrap; min-height: auto; padding: 8px; gap: 8px; }
+    .sw-label     { min-width: 80px; }
+    .sys-leds     { border: none; padding: 0; gap: 8px; order: 3; flex-wrap: wrap; }
+    .port-section { order: 2; }
+    .reset-btn    { order: 4; }
+    .led-desc     { display: none; }   /* hide desc on very narrow to save space */
+}
+
+@media (max-width: 600px) {
+    .port { width: 12px; height: 18px; }
+    .led  { width: 10px; height: 10px; }
+}

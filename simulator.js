@@ -25,6 +25,16 @@ const FAULTS = [
     { id: 'PWR_FAULT',   name: '電源模組故障',         severity: 'FAULT',   led: 'PWR',  color: 'blink-red' },
 ];
 
+// LED indicator metadata: abbreviation shown on panel, Chinese description below
+const LED_INFO = {
+    PWR:  { abbr: 'PWR',  desc: '電源狀態' },
+    SYS:  { abbr: 'SYS',  desc: '系統狀態' },
+    FAN:  { abbr: 'FAN',  desc: '散熱風扇' },
+    TEMP: { abbr: 'TEMP', desc: '機體溫度' },
+    POE:  { abbr: 'PoE',  desc: 'PoE 輸出' },
+    MGMT: { abbr: 'MGMT', desc: '管理介面' },
+};
+
 // ─────────────────────────────────────────────
 // NetworkSwitch — state machine + model
 // ─────────────────────────────────────────────
@@ -394,11 +404,20 @@ class UI {
         div.className = 'switch-unit';
         div.id = `sw-${sw.id}`;
 
-        const poeRow = sw.model.hasPoe ? `
-            <div class="led-row">
-                <span class="led-tag">PoE</span>
-                <div class="led" id="l-${sw.id}-POE"></div>
-            </div>` : '';
+        // LED keys in display order; PoE only when model supports it
+        const ledKeys = ['PWR', 'SYS', 'FAN', 'TEMP'];
+        if (sw.model.hasPoe) ledKeys.push('POE');
+        ledKeys.push('MGMT');
+
+        const ledGroups = ledKeys.map(key => {
+            const info = LED_INFO[key];
+            return `
+            <div class="led-group">
+                <div class="led" id="l-${sw.id}-${key}"></div>
+                <div class="led-name">${info.abbr}</div>
+                <div class="led-desc">${info.desc}</div>
+            </div>`;
+        }).join('');
 
         const ports = (start, end) => Array.from(
             { length: end - start + 1 },
@@ -409,39 +428,16 @@ class UI {
         <div class="switch-front">
             <div class="sw-label">
                 <div class="sw-name">${sw.name}</div>
-                <div class="sw-model">${sw.model.name}</div>
+                <div class="sw-model">${sw.model.name}<br>${sw.model.speed} / 24P${sw.model.hasPoe ? ' / PoE+' : ''}</div>
             </div>
 
             <div class="sys-leds">
-                <div class="led-row">
-                    <span class="led-tag">PWR</span>
-                    <div class="led" id="l-${sw.id}-PWR"></div>
-                </div>
-                <div class="led-row">
-                    <span class="led-tag">SYS</span>
-                    <div class="led" id="l-${sw.id}-SYS"></div>
-                </div>
-                <div class="led-row">
-                    <span class="led-tag">FAN</span>
-                    <div class="led" id="l-${sw.id}-FAN"></div>
-                </div>
-                <div class="led-row">
-                    <span class="led-tag">TEMP</span>
-                    <div class="led" id="l-${sw.id}-TEMP"></div>
-                </div>
-                ${poeRow}
+                ${ledGroups}
             </div>
 
             <div class="port-section">
                 <div class="port-row">${ports(1, 12)}</div>
                 <div class="port-row">${ports(13, 24)}</div>
-            </div>
-
-            <div class="mgmt-section">
-                <div class="mgmt-jack" title="Management Port">
-                    <div class="led" id="l-${sw.id}-MGMT"></div>
-                </div>
-                <span class="mgmt-tag">MGMT</span>
             </div>
 
             <button class="reset-btn" id="rst-${sw.id}"
