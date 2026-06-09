@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rack Analyzer</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Header -->
+<header class="ra-header">
+    <div class="ra-title">RACK ANALYZER</div>
+    <div class="summary">
+        <div class="s-item"><div class="s-dot green"></div><span id="cnt-n">—</span>&nbsp;正常</div>
+        <div class="s-item"><div class="s-dot amber"></div><span id="cnt-w">—</span>&nbsp;警告</div>
+        <div class="s-item"><div class="s-dot red"  ></div><span id="cnt-f">—</span>&nbsp;故障</div>
+        <div class="s-item"><div class="s-dot gray" ></div><span id="cnt-u">—</span>&nbsp;未知</div>
+    </div>
+    <div class="s-item"><div class="ws-dot" id="ws-dot"></div>&nbsp;RA&nbsp;Backend</div>
+    <div class="ra-clock" id="clock">--:--:--</div>
+</header>
+
+<!-- Camera thumbnails -->
+<div class="cam-row">
+    <div class="cam-row-title">Camera Feeds</div>
+    <div class="cam-grid" id="cam-grid"></div>
+</div>
+
+<!-- Body: switch cards + alert panel -->
+<div class="ra-body">
+    <div class="switch-col" id="switch-col"></div>
+    <div class="alert-col">
+        <div class="alert-title">Alert Timeline</div>
+        <div class="alert-list" id="alert-list"><div class="no-alert">No alerts yet</div></div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

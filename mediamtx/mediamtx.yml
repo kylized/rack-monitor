@@ -1,0 +1,17 @@
+logLevel: error
+logDestinations: [stdout]
+
+rtspAddress: :8554
+rtspEncryption: no
+
+# Disable unused protocols
+rtmp: no
+hls: no
+webrtc: no
+
+paths:
+  cam0: {}
+  cam1: {}
+  cam2: {}
+  cam3: {}
+  cam4: {}
