@@ -557,7 +557,7 @@ function pad(n)           { return String(n).padStart(2, '0'); }
 // Bootstrap
 // ─────────────────────────────────────────────
 
-const sim = new RackSimulator(8);
+const sim = new RackSimulator(5);
 const ui  = new UI();
 
 document.addEventListener('DOMContentLoaded', () => {

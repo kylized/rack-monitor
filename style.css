@@ -22,32 +22,49 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { height: 100%; }
+
 body {
     background: var(--bg);
     color: var(--text);
     font-family: 'Courier New', 'Consolas', monospace;
     font-size: 11px;
-    min-height: 100vh;
-    padding: 16px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+}
+
+.app {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
 }
 
 /* ── Header ── */
 header {
+    flex-shrink: 0;
     text-align: center;
-    margin-bottom: 18px;
-    padding-bottom: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
     border-bottom: 1px solid #1e2228;
 }
 header h1 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
     letter-spacing: 4px;
     color: var(--accent);
 }
-.subtitle { color: var(--muted); letter-spacing: 1px; margin-top: 4px; font-size: 10px; }
+.subtitle { color: var(--muted); letter-spacing: 1px; margin-top: 3px; font-size: 10px; }
 
 /* ── Master Panel ── */
 .master-panel {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 16px;
@@ -55,8 +72,8 @@ header h1 {
     background: var(--bg-panel);
     border: 1px solid #2a2e36;
     border-radius: 6px;
-    padding: 12px 18px;
-    margin-bottom: 18px;
+    padding: 8px 14px;
+    margin-bottom: 8px;
 }
 .panel-title {
     font-size: 11px;
@@ -106,30 +123,40 @@ header h1 {
 .s-dot.gray   { background: #444; }
 
 /* ── Rack ── */
-.rack-container { display: flex; justify-content: center; }
+.rack-container {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
 
 .rack-frame {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     background: var(--rack-bg);
     border: 3px solid var(--rack-border);
     border-radius: 4px;
-    padding: 10px;
-    width: 100%;
+    padding: 8px;
     box-shadow: 0 0 40px rgba(0,0,0,.9), inset 0 0 12px rgba(0,0,0,.6);
 }
 
 .rack-header {
+    flex-shrink: 0;
     text-align: center;
     color: #333;
     font-size: 9px;
     letter-spacing: 3px;
     text-transform: uppercase;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .rack-inner {
+    flex: 1;
+    min-height: 0;
     display: grid;
     grid-template-columns: 22px 1fr 22px;
-    gap: 0;
+    grid-template-rows: 1fr;
 }
 
 .rack-rail {
@@ -153,6 +180,7 @@ header h1 {
 }
 
 .rack-body {
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -163,6 +191,10 @@ header h1 {
 
 /* ── Switch Unit ── */
 .switch-unit {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     background: var(--sw-bg);
     border: 1px solid var(--sw-border);
     border-radius: 1px;
@@ -175,12 +207,13 @@ header h1 {
 
 /* Front panel */
 .switch-front {
+    flex: 1;
+    min-height: 0;
     background: var(--sw-front);
     padding: 6px 10px;
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 76px;
     border-bottom: 1px solid #111;
 }
 .switch-unit.state-offline .switch-front { background: #141618; }
@@ -320,16 +353,18 @@ header h1 {
 
 /* Status bar */
 .sw-status {
+    flex-shrink: 0;
     background: #090b0e;
     border-top: 1px solid #111;
-    padding: 5px 10px;
+    padding: 4px 10px;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
-    line-height: 1.7;
+    flex-wrap: nowrap;
+    overflow: hidden;
     font-size: 10px;
-    min-height: 28px;
+    height: 26px;
+    white-space: nowrap;
 }
 .sw-status.hidden { display: none; }
 
@@ -367,12 +402,12 @@ header h1 {
 }
 
 @media (max-width: 860px) {
-    .switch-front { flex-wrap: wrap; min-height: auto; padding: 8px; gap: 8px; }
+    .switch-front { flex-wrap: wrap; padding: 8px; gap: 8px; }
     .sw-label     { min-width: 80px; }
     .sys-leds     { border: none; padding: 0; gap: 8px; order: 3; flex-wrap: wrap; }
     .port-section { order: 2; }
     .reset-btn    { order: 4; }
-    .led-desc     { display: none; }   /* hide desc on very narrow to save space */
+    .led-desc     { display: none; }
 }
 
 @media (max-width: 600px) {
