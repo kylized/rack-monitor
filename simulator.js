@@ -115,11 +115,9 @@ class NetworkSwitch {
 
         if (def.portEffect) {
             const up = this.ports.filter(p => p.state === 'up');
-            const n  = Math.max(1, Math.floor(up.length * 0.2));
-            for (let i = 0; i < n; i++) {
-                const p = up[Math.floor(Math.random() * up.length)];
-                p.state = def.portEffect;
-            }
+            const n  = Math.max(2, Math.floor(up.length * 0.35));
+            const shuffled = up.sort(() => Math.random() - 0.5);
+            shuffled.slice(0, n).forEach(p => { p.state = def.portEffect; p.active = false; });
         }
 
         if (faultId === 'TEMP_WARN') this.temp = 66 + Math.random() * 8;
@@ -149,8 +147,7 @@ class NetworkSwitch {
                     p.activeTimer = 1 + Math.floor(Math.random() * 3);
                 }
             } else if (p.state === 'flap') {
-                p.state  = Math.random() > 0.5 ? 'up' : 'down';
-                p.active = false;
+                // Stay in flap; CSS animation handles the visual, cleared when fault resolves
             } else if (p.state === 'down' && Math.random() < 0.003) {
                 p.state = 'up';
                 p.speed = Math.random() > 0.3 ? 1000 : 100;
@@ -421,7 +418,10 @@ class UI {
 
         const ports = (start, end) => Array.from(
             { length: end - start + 1 },
-            (_, i) => `<div class="port" id="p-${sw.id}-${start + i}" title="Port ${start + i}"></div>`
+            (_, i) => {
+                const n = start + i;
+                return `<div class="port-wrap"><div class="port" id="p-${sw.id}-${n}" title="Port ${n}"></div><div class="port-num">${n}</div></div>`;
+            }
         ).join('');
 
         div.innerHTML = `

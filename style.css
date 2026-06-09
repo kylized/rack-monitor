@@ -305,23 +305,39 @@ header h1 {
 }
 .port-row { display: flex; gap: 3px; }
 
-/* Visual gap every 4 ports (positions 5 and 9 in each 12-port row) */
-.port:nth-child(4n+1):not(:first-child) { margin-left: 5px; }
+/* Port wrapper: LED + number label */
+.port-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+/* Visual gap every 4 ports */
+.port-wrap:nth-child(4n+1):not(:first-child) { margin-left: 5px; }
 
 .port {
-    width: 15px; height: 22px;
+    width: 15px; height: 20px;
     border-radius: 2px;
     background: #0d0f12;
     border: 1px solid #111;
     cursor: help;
     transition: background .15s;
-    flex-shrink: 0;
+}
+
+.port-num {
+    font-size: 6px;
+    color: #2a3040;
+    line-height: 1;
+    user-select: none;
+    letter-spacing: 0;
 }
 .port.up       { background: #006630; box-shadow: inset 0 0 4px #009944; }
 .port.active   { animation: portBlink .15s infinite; }
-.port.error    { background: #553300; box-shadow: inset 0 0 4px #aa6600; }
+.port.error    { background: #6b3300; box-shadow: inset 0 0 5px #ffaa00, 0 0 4px #aa6600; }
 .port.disabled { background: #1a1a1a; }
-.port.flap     { animation: portFlap  .4s infinite; }
+.port.flap     { animation: portFlap  .35s infinite; }
 
 @keyframes portBlink {
     0%,100% { background:#00ff44; box-shadow:inset 0 0 4px #00ff44; }
