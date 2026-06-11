@@ -5,11 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rack Analyzer</title>
 <link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-<!-- Header -->
 <header class="ra-header">
     <div class="ra-title">RACK ANALYZER</div>
     <div class="summary">
@@ -22,19 +20,14 @@
     <div class="ra-clock" id="clock">--:--:--</div>
 </header>
 
-<!-- Camera thumbnails -->
-<div class="cam-row">
-    <div class="cam-row-title">Camera Feeds</div>
-    <div class="cam-grid" id="cam-grid"></div>
-</div>
-
-<!-- Body: switch cards + alert panel -->
 <div class="ra-body">
-    <div class="switch-col" id="switch-col"></div>
-    <div class="alert-col">
-        <div class="alert-title">Alert Timeline</div>
-        <div class="alert-list" id="alert-list"><div class="no-alert">No alerts yet</div></div>
-    </div>
+
+    <!-- Left: stacked camera + LED rows -->
+    <div class="cam-led-col" id="cam-led-col"></div>
+
+    <!-- Right: status panel -->
+    <div class="status-col" id="status-col"></div>
+
 </div>
 
 <script src="app.js"></script>

@@ -7,7 +7,7 @@ from control_panel import ControlPanel
 from capture import CameraCapture
 
 RTSP_BASE = "rtsp://localhost:8554"
-CAP_FPS   = 10
+CAP_FPS   = 24
 NUM_CAMS  = 5
 
 
@@ -25,16 +25,16 @@ def main():
                 _cap.update_region(x, y, w, h)
         cam.geometry_changed.connect(_on_geom)
 
-    # Place overlays in a horizontal row near the top-third of the primary screen
+    # Place overlays in a vertical column on the right side of the screen
     screen   = app.primaryScreen().geometry()
     ow, oh   = 380, 110
     gap      = 8
-    total_w  = NUM_CAMS * ow + (NUM_CAMS - 1) * gap
-    start_x  = max(0, (screen.width() - total_w) // 2)
-    start_y  = screen.height() // 3
+    total_h  = NUM_CAMS * oh + (NUM_CAMS - 1) * gap
+    start_x  = screen.width() - ow - 20
+    start_y  = max(0, (screen.height() - total_h) // 2)
 
     for i, cam in enumerate(cameras):
-        cam.move(start_x + i * (ow + gap), start_y)
+        cam.move(start_x, start_y + i * (oh + gap))
         cam.show()
 
     panel = ControlPanel(cameras, captures)

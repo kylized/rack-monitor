@@ -47,11 +47,17 @@ class TimeSeriesAnalyzer:
                 c["fault"] = c["warning"] = 0
 
     def _alert(self, state: SwitchState, kind: str):
+        from dataclasses import asdict
+        leds_dict  = asdict(state.leds)
+        fault_leds = [
+            label for label in state.detected_labels
+            if leds_dict.get(label, "off").replace("blink-", "") in ("red", "amber")
+        ]
         self.store.add_alert(Alert(
-            switch_id = state.switch_id,
-            cam_id    = state.cam_id,
-            kind      = kind,
-            score     = state.anomaly_score,
-            timestamp = datetime.now().strftime("%H:%M:%S"),
-            resolved  = "CLEARED" in kind,
+            switch_id  = state.switch_id,
+            cam_id     = state.cam_id,
+            kind       = kind,
+            fault_leds = fault_leds,
+            timestamp  = datetime.now().strftime("%H:%M:%S"),
+            resolved   = "CLEARED" in kind,
         ))

@@ -8,14 +8,15 @@ import cv2
 import numpy as np
 
 from analyzer import analyze_frame
+from broadcaster import broadcasters
 from state_store import StateStore
 from timeseries import TimeSeriesAnalyzer
 
 logger = logging.getLogger(__name__)
 
 RTSP_URLS     = [f"rtsp://localhost:8554/cam{i}" for i in range(5)]
-ANALYSIS_FPS  = 1    # frames sent to CV analyzer per second
-SNAPSHOT_FPS  = 2    # thumbnail refresh rate
+ANALYSIS_FPS  = 5    # frames sent to CV analyzer per second (≥4 needed for blink detection)
+SNAPSHOT_FPS  = 10   # thumbnail refresh rate
 
 
 def _jpeg(frame: np.ndarray) -> bytes:
@@ -62,12 +63,14 @@ class CameraIngester:
                 now = time.monotonic()
 
                 if now - t_snapshot >= 1.0 / SNAPSHOT_FPS:
-                    self.store.set_snapshot(self.cam_id, _jpeg(frame))
+                    jpeg = _jpeg(frame)
+                    self.store.set_snapshot(self.cam_id, jpeg)  # kept for REST /api/snapshot
+                    broadcasters[self.cam_id].publish(jpeg)
                     t_snapshot = now
 
                 if now - t_analysis >= 1.0 / ANALYSIS_FPS:
                     try:
-                        state = analyze_frame(frame, self.cam_id)
+                        state = analyze_frame(frame, self.cam_id, self.store)
                         self.store.update(state)
                         self.ts.process(state)
                     except Exception as exc:

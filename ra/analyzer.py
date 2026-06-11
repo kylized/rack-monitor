@@ -1,112 +1,150 @@
-"""CV frame analysis: HSV LED color detection → SwitchState."""
+"""
+CV frame analysis pipeline:
+
+  1. LedLocator  — OCR finds label text → derives exact LED dot crop box
+  2. _dominant_color — HSV colour detection on the precise crop
+  3. StateStore.record_led / is_blinking — blink detection across frames
+  4. _derive_state / _anomaly_score — rules-based status
+
+Fallback: if LedLocator cannot detect labels (< 4 found), the old
+percentage-based region split is used so the system still produces output.
+"""
 
 from datetime import datetime
 
 import cv2
 import numpy as np
 
-from state_store import LEDState, SwitchState
+from led_locator import LED_LABELS, LedLocator
+from state_store import LEDState, StateStore, SwitchState
 
-# ── HSV color ranges (OpenCV: H 0-180, S 0-255, V 0-255) ─────────────────────
-# Simulator colors: green #00e676, amber #ffab00, red #ff1744
-_HSV = {
-    "green": (np.array([38,  80,  80]),  np.array([88,  255, 255])),
-    "amber": (np.array([12, 100, 100]),  np.array([32,  255, 255])),
-    "red_lo":(np.array([0,  100, 100]),  np.array([10,  255, 255])),
-    "red_hi":(np.array([168,100, 100]),  np.array([180, 255, 255])),
+# ── HSV colour ranges (OpenCV H 0-180, S 0-255, V 0-255) ─────────────────────
+# Simulator palette: green #00e676, amber #ffab00, red #ff1744
+_HSV: dict[str, tuple[np.ndarray, np.ndarray]] = {
+    "green":  (np.array([38,  80,  80]),  np.array([88,  255, 255])),
+    "amber":  (np.array([12, 100, 100]),  np.array([32,  255, 255])),
+    "red_lo": (np.array([0,  100, 100]),  np.array([10,  255, 255])),
+    "red_hi": (np.array([168,100, 100]),  np.array([180, 255, 255])),
 }
 
-LED_NAMES = ["PWR", "SYS", "FAN", "TEMP", "POE", "MGMT"]
+# Fallback layout (percentage of frame) used when OCR detection fails
+_FB_SYS_X = (0.17, 0.42)
+_FB_SYS_Y = (0.22, 0.90)
 
-# ROI layout as fractions of frame dimensions
-# Simulator front-panel zones (approximate, accounts for title-bar offset):
-#   sw-label  : x  0%–17%
-#   sys-leds  : x 17%–42%   ← 6 LEDs, equally spaced
-#   port-sect : x 42%–88%
-#   (title bar from native overlay: top ~20% of frame height)
-_SYS_X  = (0.17, 0.42)
-_SYS_Y  = (0.22, 0.90)   # start below overlay title bar (~22% of frame)
-_PORT_X = (0.42, 0.88)
-_PORT_Y = (0.22, 0.90)
+_locator = LedLocator()
 
+
+# ── colour helpers ────────────────────────────────────────────────────────────
 
 def _dominant_color(region: np.ndarray) -> str:
+    """Return dominant colour name ('green'/'amber'/'red'/'off') for a crop."""
     if region.size == 0:
         return "off"
     hsv = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
     counts: dict[str, int] = {}
     for name, (lo, hi) in _HSV.items():
-        mask = cv2.inRange(hsv, lo, hi)
-        counts[name] = int(mask.sum() // 255)
+        counts[name] = int(cv2.inRange(hsv, lo, hi).sum() // 255)
     counts["red"] = counts.pop("red_lo", 0) + counts.pop("red_hi", 0)
     total = sum(counts.values())
-    if total < 15:
+    if total < 5:
         return "off"
     best = max(counts, key=counts.get)
-    return best if counts[best] > 8 else "off"
+    return best if counts[best] > 3 else "off"
 
 
-def _detect_leds(region: np.ndarray) -> LEDState:
-    """Split sys-led region into 6 horizontal slices → detect each LED color."""
-    if region.size == 0:
-        return LEDState()
-    h, w = region.shape[:2]
-    slice_w = max(1, w // 6)
-    colors = []
-    for i in range(6):
-        x0 = i * slice_w
-        cell = region[:, x0: x0 + slice_w]
-        colors.append(_dominant_color(cell))
-    return LEDState(**dict(zip(LED_NAMES, colors)))
+# ── LED detection ─────────────────────────────────────────────────────────────
+
+def _detect_leds_precise(
+    frame: np.ndarray,
+    boxes: dict[str, tuple[int, int, int, int]],
+) -> dict[str, str]:
+    """Crop each LED dot exactly and detect its colour."""
+    h, w = frame.shape[:2]
+    colours: dict[str, str] = {}
+    for label in LED_LABELS:
+        if label not in boxes:
+            colours[label] = "off"
+            continue
+        x0, y0, x1, y1 = boxes[label]
+        x0, y0 = max(0, x0), max(0, y0)
+        x1, y1 = min(w, x1), min(h, y1)
+        colours[label] = _dominant_color(frame[y0:y1, x0:x1])
+    return colours
 
 
-def _detect_ports(region: np.ndarray) -> tuple[float, float]:
-    """Return (up_ratio, err_ratio) from port section frame."""
-    if region.size == 0:
-        return 0.0, 0.0
-    hsv   = cv2.cvtColor(region, cv2.COLOR_BGR2HSV)
-    total = region.shape[0] * region.shape[1]
-    green = int(cv2.inRange(hsv, *_HSV["green"]).sum() // 255)
-    amber = int(cv2.inRange(hsv, *_HSV["amber"]).sum() // 255)
-    ref   = max(1, total * 0.08)
-    return round(min(1.0, green / ref), 3), round(min(1.0, amber / ref), 3)
+def _detect_leds_fallback(frame: np.ndarray) -> dict[str, str]:
+    """Old percentage-split method — used when OCR localisation fails."""
+    h, w = frame.shape[:2]
+    x0 = int(w * _FB_SYS_X[0]); x1 = int(w * _FB_SYS_X[1])
+    y0 = int(h * _FB_SYS_Y[0]); y1 = int(h * _FB_SYS_Y[1])
+    region = frame[y0:y1, x0:x1]
+    rh, rw = region.shape[:2]
+    slice_w = max(1, rw // 6)
+    colours: dict[str, str] = {}
+    for i, label in enumerate(LED_LABELS):
+        cell = region[:, i * slice_w: (i + 1) * slice_w]
+        colours[label] = _dominant_color(cell)
+    return colours
 
 
-def _derive_state(led: LEDState, err_ratio: float) -> str:
-    if led.PWR == "off":
+def _apply_blink(
+    colours: dict[str, str],
+    switch_id: int,
+    store: StateStore,
+) -> dict[str, str]:
+    """
+    Add a 'blink-' prefix to any LED whose colour history shows alternation
+    between a colour and off.
+    """
+    result = dict(colours)
+    for label, colour in colours.items():
+        if colour != "off" and store.is_blinking(switch_id, label):
+            result[label] = f"blink-{colour}"
+    return result
+
+
+# ── state derivation ──────────────────────────────────────────────────────────
+
+def _derive_state(colours: dict[str, str]) -> str:
+    if colours.get("PWR", "off") == "off":
         return "OFFLINE"
-    if any(getattr(led, n) == "red" for n in LED_NAMES):
-        return "FAULT"
-    if any(getattr(led, n) == "amber" for n in LED_NAMES) or err_ratio > 0.25:
-        return "WARNING"
+    base = {c.replace("blink-", "") for c in colours.values()}
+    if "red"   in base: return "FAULT"
+    if "amber" in base: return "WARNING"
     return "NORMAL"
 
 
-def _anomaly_score(led: LEDState, err_ratio: float) -> float:
-    weights = {"PWR": 0.25, "SYS": 0.25, "FAN": 0.20, "TEMP": 0.15, "POE": 0.10, "MGMT": 0.05}
-    cv_map  = {"off": 0.0, "green": 0.0, "amber": 0.5, "red": 1.0}
-    score   = sum(weights[n] * cv_map.get(getattr(led, n), 0.3) for n in LED_NAMES)
-    score  += err_ratio * 0.25
-    return round(min(1.0, score), 3)
+# ── public entry point ────────────────────────────────────────────────────────
 
+def analyze_frame(
+    frame_bgr: np.ndarray,
+    cam_id: int,
+    store: StateStore,
+) -> SwitchState:
+    # ── 1. Locate LEDs via OCR ───────────────────────────────────────────────
+    boxes = _locator.get(frame_bgr, cam_id)
 
-def analyze_frame(frame_bgr: np.ndarray, cam_id: int) -> SwitchState:
-    h, w = frame_bgr.shape[:2]
+    if boxes:
+        raw_colours      = _detect_leds_precise(frame_bgr, boxes)
+        detected_labels  = list(boxes.keys())          # OCR-found labels, in x-order
+        locator_status   = "calibrated"
+    else:
+        raw_colours      = _detect_leds_fallback(frame_bgr)
+        detected_labels  = LED_LABELS[:]               # fallback: use all standard names
+        locator_status   = "fallback"
 
-    def crop(xr, yr):
-        return frame_bgr[int(h * yr[0]): int(h * yr[1]),
-                         int(w * xr[0]): int(w * xr[1])]
-
-    led  = _detect_leds(crop(_SYS_X, _SYS_Y))
-    up_r, err_r = _detect_ports(crop(_PORT_X, _PORT_Y))
+    # ── 2. Record raw colours, then apply blink detection ───────────────────
+    raw_leds      = LEDState(**raw_colours)
+    store.record_led(cam_id + 1, raw_leds)
+    final_colours = _apply_blink(raw_colours, cam_id + 1, store)
 
     return SwitchState(
-        switch_id     = cam_id + 1,
-        cam_id        = cam_id,
-        state         = _derive_state(led, err_r),
-        leds          = led,
-        port_up_ratio = up_r,
-        port_err_ratio= err_r,
-        anomaly_score = _anomaly_score(led, err_r),
-        timestamp     = datetime.now().strftime("%H:%M:%S"),
+        switch_id       = cam_id + 1,
+        cam_id          = cam_id,
+        state           = _derive_state(final_colours),
+        leds            = LEDState(**final_colours),
+        port_up_ratio   = 0.0,
+        detected_labels = detected_labels,
+        locator_status  = locator_status,
+        timestamp       = datetime.now().strftime("%H:%M:%S"),
     )

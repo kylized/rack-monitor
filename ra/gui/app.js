@@ -1,26 +1,18 @@
 'use strict';
 
-const NUM_CAMS    = 5;
-const WS_URL      = `ws://${location.host}/ws`;
-const SNAP_PERIOD = 1000;   // ms between snapshot refreshes
+const NUM_CAMS = 5;
+const WS_URL   = `ws://${location.host}/ws`;
 
-const LED_NAMES  = ['PWR','SYS','FAN','TEMP','POE','MGMT'];
-const LED_LABELS = { PWR:'電源', SYS:'系統', FAN:'風扇', TEMP:'溫度', POE:'PoE', MGMT:'管理' };
-
-// Chart.js instances per switch (keyed by switch_id 1-5)
-const charts = {};
-
-// ── Bootstrap ────────────────────────────────────────────────────────────────
+// ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    buildCamGrid();
-    buildSwitchCards();
+    buildRows();
+    buildStatusCards();
     startClock();
-    startSnapshotPolling();
     connectWS();
 });
 
-// ── Clock ────────────────────────────────────────────────────────────────────
+// ── Clock ─────────────────────────────────────────────────────────────────────
 
 function startClock() {
     const el = document.getElementById('clock');
@@ -29,103 +21,145 @@ function startClock() {
     }, 1000);
 }
 
-// ── Camera grid ──────────────────────────────────────────────────────────────
+// ── Build initial DOM ─────────────────────────────────────────────────────────
 
-function buildCamGrid() {
-    const grid = document.getElementById('cam-grid');
+function buildRows() {
+    const col = document.getElementById('cam-led-col');
     for (let i = 0; i < NUM_CAMS; i++) {
-        const wrap = document.createElement('div');
-        wrap.className = 'cam-thumb';
-        wrap.innerHTML = `
-            <img id="snap-${i}" alt="CAM-${i}" title="CAM-${i}">
-            <div class="cam-label"><span>CAM-${i}</span> → SW-0${i+1}</div>`;
-        grid.appendChild(wrap);
+        const row = document.createElement('div');
+        row.className = 'cam-row';
+        row.id = `cam-row-${i}`;
+        row.innerHTML = `
+            <div class="cam-feed-wrap">
+                <img src="/api/stream/${i}" alt="CAM-${i}">
+                <div class="cam-feed-label">CAM-${i} → SW-0${i + 1}</div>
+                <div class="cam-stats-label" id="cam-stats-${i}">— fps · — KB/s</div>
+            </div>
+            <div class="led-panel" id="led-panel-${i}">
+                <div class="cam-row-header">
+                    <span class="cam-sw-label">SW-0${i + 1}</span>
+                    <span class="state-badge UNKNOWN" id="badge-${i}">UNKNOWN</span>
+                    <span class="cam-ts" id="ts-${i}">—</span>
+                </div>
+                <div class="led-dot-row" id="led-row-${i}">
+                    <span class="led-searching">OCR 校準中…</span>
+                </div>
+            </div>`;
+        col.appendChild(row);
     }
 }
 
-function startSnapshotPolling() {
-    function refresh() {
-        for (let i = 0; i < NUM_CAMS; i++) {
-            const img = document.getElementById(`snap-${i}`);
-            if (img) img.src = `/api/snapshot/${i}?t=${Date.now()}`;
-        }
-    }
-    refresh();
-    setInterval(refresh, SNAP_PERIOD);
-}
-
-// ── Switch cards ─────────────────────────────────────────────────────────────
-
-function buildSwitchCards() {
-    const col = document.getElementById('switch-col');
-    for (let i = 1; i <= NUM_CAMS; i++) {
+function buildStatusCards() {
+    const col = document.getElementById('status-col');
+    col.innerHTML = `<div class="status-col-title">Analysis Status</div>`;
+    for (let i = 0; i < NUM_CAMS; i++) {
         const card = document.createElement('div');
-        card.className = 'sw-card';
-        card.id = `sw-card-${i}`;
+        card.className = 'status-card';
+        card.id = `status-card-${i}`;
         card.innerHTML = `
-        <div class="sw-card-header">
-            <span class="sw-name-lbl">SW-0${i}</span>
-            <span class="sw-cam-lbl">CAM-${i-1}</span>
-            <span class="state-badge UNKNOWN" id="badge-${i}">UNKNOWN</span>
-            <span class="sw-ts" id="ts-${i}">—</span>
-        </div>
-        <div class="sw-card-body">
-            <div class="led-row" id="leds-${i}">
-                ${LED_NAMES.map(n => `
-                <div class="led-group">
-                    <div class="led-dot off" id="led-${i}-${n}"></div>
-                    <div class="led-name">${n}</div>
-                </div>`).join('')}
+            <div class="status-card-header">
+                <div class="status-state-dot UNKNOWN" id="sdot-${i}"></div>
+                <span>CAM-${i} · SW-0${i + 1}</span>
             </div>
-            <div class="bar-row">
-                <span class="bar-label">Ports up</span>
-                <div class="bar-track"><div class="bar-fill green" id="bar-port-${i}" style="width:0%"></div></div>
-                <span class="bar-val" id="val-port-${i}">—</span>
-            </div>
-            <div class="bar-row">
-                <span class="bar-label">Port errors</span>
-                <div class="bar-track"><div class="bar-fill amber" id="bar-err-${i}" style="width:0%"></div></div>
-                <span class="bar-val" id="val-err-${i}">—</span>
-            </div>
-            <div class="bar-row">
-                <span class="bar-label">Anomaly score</span>
-                <div class="bar-track"><div class="bar-fill green" id="bar-anom-${i}" style="width:0%"></div></div>
-                <span class="bar-val" id="val-anom-${i}">—</span>
-            </div>
-            <div class="chart-wrap"><canvas id="chart-${i}"></canvas></div>
-        </div>`;
+            <div class="status-ocr" id="socr-${i}">Searching…</div>
+            <div class="status-faults" id="sfaults-${i}"></div>
+            <div class="status-fps" id="sfps-${i}">— fps · — KB/s</div>
+            <div class="status-ts" id="sts-${i}">—</div>`;
         col.appendChild(card);
-        initChart(i);
     }
 }
 
-function initChart(switchId) {
-    const ctx = document.getElementById(`chart-${switchId}`).getContext('2d');
-    charts[switchId] = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: Array(60).fill(''),
-            datasets: [{
-                data: Array(60).fill(0),
-                borderColor: '#00e676',
-                borderWidth: 1.5,
-                fill: true,
-                backgroundColor: 'rgba(0,230,118,0.08)',
-                pointRadius: 0,
-                tension: 0.3,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { display: false },
-                y: { display: false, min: 0, max: 1 },
+// ── LED row rendering ─────────────────────────────────────────────────────────
+
+function renderLedRow(camId, sw) {
+    const row = document.getElementById(`led-row-${camId}`);
+    if (!row) return;
+
+    const labels   = sw.detected_labels || [];
+    const ledsDict = sw.leds || {};
+
+    if (labels.length === 0) {
+        row.innerHTML = `<span class="led-searching">OCR 校準中…</span>`;
+        return;
+    }
+
+    row.innerHTML = labels.map(label => {
+        const raw    = ledsDict[label] || 'off';
+        const cls    = ledClass(raw);
+        return `
+            <div class="led-item">
+                <div class="led-dot ${cls}" id="led-${camId}-${label}"></div>
+                <div class="led-label">${label}</div>
+            </div>`;
+    }).join('');
+}
+
+function ledClass(color) {
+    if (!color || color === 'off') return 'off';
+    if (color === 'green') return 'green';
+    if (color === 'amber') return 'amber';
+    if (color === 'red')   return 'red';
+    if (color.startsWith('blink-green')) return 'blink-green';
+    if (color.startsWith('blink-amber')) return 'blink-amber';
+    if (color.startsWith('blink-red'))   return 'blink-red';
+    return 'off';
+}
+
+// ── Status card rendering ─────────────────────────────────────────────────────
+
+function renderStatusCard(camId, sw, fps, kbps) {
+    const card    = document.getElementById(`status-card-${camId}`);
+    const sdot    = document.getElementById(`sdot-${camId}`);
+    const socr    = document.getElementById(`socr-${camId}`);
+    const sfaults = document.getElementById(`sfaults-${camId}`);
+    const sfps    = document.getElementById(`sfps-${camId}`);
+    const sts     = document.getElementById(`sts-${camId}`);
+    if (!card) return;
+
+    const state  = sw.state || 'UNKNOWN';
+    const labels = sw.detected_labels || [];
+    const leds   = sw.leds || {};
+
+    // Card background class
+    card.className = `status-card state-${state.toLowerCase()}`;
+
+    // State dot
+    sdot.className = `status-state-dot ${state}`;
+
+    // OCR status
+    const locStatus = sw.locator_status || 'searching';
+    if (locStatus === 'calibrated') {
+        socr.textContent = `OCR: ${labels.length}/6 labels`;
+        socr.className   = 'status-ocr ok';
+    } else if (locStatus === 'fallback') {
+        socr.textContent = 'Fallback mode (OCR n/a)';
+        socr.className   = 'status-ocr';
+    } else {
+        socr.textContent = 'Searching for labels…';
+        socr.className   = 'status-ocr';
+    }
+
+    // Fault LEDs
+    const faultItems = labels
+        .map(label => {
+            const raw = (leds[label] || 'off').replace('blink-', '');
+            if (raw === 'red' || raw === 'amber') {
+                return `<span class="fault-led-tag ${raw}">${label}</span>`;
             }
-        }
-    });
+            return null;
+        })
+        .filter(Boolean);
+
+    sfaults.innerHTML = faultItems.length
+        ? faultItems.join('')
+        : (state === 'NORMAL' ? '<span style="color:#1a5a30">All clear</span>' : '');
+
+    // FPS / KB/s
+    const rateStr = kbps > 0 ? `${kbps.toFixed(1)} KB/s` : '— KB/s';
+    sfps.textContent = `${(fps || 0).toFixed(1)} fps · ${rateStr}`;
+
+    // Timestamp
+    sts.textContent = sw.timestamp || '—';
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -136,127 +170,56 @@ function connectWS() {
 
     ws.onopen = () => {
         dot.className = 'ws-dot ok';
-        // keep-alive ping every 10s
         setInterval(() => { if (ws.readyState === WebSocket.OPEN) ws.send('ping'); }, 10000);
     };
 
     ws.onmessage = ({ data }) => {
         const msg = JSON.parse(data);
-        updateSummary(msg.summary);
-        if (msg.switches) msg.switches.forEach(sw => sw && updateSwCard(sw));
-        if (msg.alerts)   updateAlerts(msg.alerts);
-        if (msg.history)  updateCharts(msg.history);
+        if (msg.summary)   updateSummary(msg.summary);
+        if (msg.switches)  updateSwitches(msg.switches, msg.cam_stats || []);
+        if (msg.cam_stats) updateCamStats(msg.cam_stats);
     };
 
-    ws.onclose = () => {
-        dot.className = 'ws-dot err';
-        setTimeout(connectWS, 3000);
-    };
-
+    ws.onclose = () => { dot.className = 'ws-dot err'; setTimeout(connectWS, 3000); };
     ws.onerror = () => ws.close();
 }
 
-// ── Update helpers ────────────────────────────────────────────────────────────
-
 function updateSummary(s) {
-    if (!s) return;
     document.getElementById('cnt-n').textContent = s.normal  ?? '—';
     document.getElementById('cnt-w').textContent = s.warning ?? '—';
     document.getElementById('cnt-f').textContent = s.fault   ?? '—';
     document.getElementById('cnt-u').textContent = s.unknown ?? '—';
 }
 
-function updateSwCard(sw) {
-    const id = sw.switch_id;
-    if (!id) return;
+function updateSwitches(switches, camStats) {
+    switches.forEach(sw => {
+        if (!sw) return;
+        const i = sw.cam_id;
 
-    // Card border
-    const card = document.getElementById(`sw-card-${id}`);
-    if (!card) return;
-    card.className = `sw-card state-${(sw.state || 'unknown').toLowerCase()}`;
+        // Badge + timestamp
+        const badge = document.getElementById(`badge-${i}`);
+        if (badge) {
+            badge.textContent = sw.state || 'UNKNOWN';
+            badge.className   = `state-badge ${sw.state || 'UNKNOWN'}`;
+        }
+        const ts = document.getElementById(`ts-${i}`);
+        if (ts) ts.textContent = sw.timestamp || '—';
 
-    // Badge
-    const badge = document.getElementById(`badge-${id}`);
-    badge.textContent = sw.state || 'UNKNOWN';
-    badge.className   = `state-badge ${sw.state || 'UNKNOWN'}`;
+        // LED row
+        renderLedRow(i, sw);
 
-    // Timestamp
-    const ts = document.getElementById(`ts-${id}`);
-    if (ts) ts.textContent = sw.timestamp || '';
-
-    // LEDs
-    const leds = sw.leds || {};
-    LED_NAMES.forEach(n => {
-        const el = document.getElementById(`led-${id}-${n}`);
-        if (!el) return;
-        const color = leds[n] || 'off';
-        el.className = `led-dot ${ledClass(color)}`;
+        // Status card
+        const cs = camStats[i] || { fps: 0, kbps: 0 };
+        renderStatusCard(i, sw, cs.fps, cs.kbps);
     });
-
-    // Bars
-    const up   = sw.port_up_ratio  ?? 0;
-    const err  = sw.port_err_ratio ?? 0;
-    const anom = sw.anomaly_score  ?? 0;
-
-    setBar(`bar-port-${id}`, `val-port-${id}`, up,   anomColor(0),      `${(up  *100).toFixed(0)}%`);
-    setBar(`bar-err-${id}`,  `val-err-${id}`,  err,  anomColor(err),    `${(err *100).toFixed(0)}%`);
-    setBar(`bar-anom-${id}`, `val-anom-${id}`, anom, anomColor(anom),   anom.toFixed(2));
 }
 
-function setBar(barId, valId, ratio, colorClass, label) {
-    const bar = document.getElementById(barId);
-    const val = document.getElementById(valId);
-    if (bar) { bar.style.width = `${(ratio * 100).toFixed(1)}%`; bar.className = `bar-fill ${colorClass}`; }
-    if (val) val.textContent = label;
-}
-
-function anomColor(v) {
-    if (v >= 0.7) return 'red';
-    if (v >= 0.4) return 'amber';
-    return 'green';
-}
-
-function ledClass(color) {
-    if (color === 'off')   return 'off';
-    if (color === 'green') return 'green';
-    if (color === 'amber') return 'amber';
-    if (color === 'red')   return 'red';
-    // blink variants from simulator (treated as the base color for RA display)
-    if (color.includes('green')) return 'blink-green';
-    if (color.includes('amber')) return 'blink-amber';
-    if (color.includes('red'))   return 'blink-red';
-    return 'off';
-}
-
-function updateCharts(history) {
-    for (const [switchId, data] of Object.entries(history)) {
-        const chart = charts[parseInt(switchId)];
-        if (!chart || !Array.isArray(data)) continue;
-        const len  = chart.data.datasets[0].data.length;
-        const vals = Array(len).fill(0);
-        data.slice(-len).forEach((v, i) => { vals[len - data.slice(-len).length + i] = v; });
-        chart.data.datasets[0].data = vals;
-        // Color sparkline by max anomaly
-        const maxV = Math.max(...vals);
-        chart.data.datasets[0].borderColor = maxV >= 0.7 ? '#ff1744' : maxV >= 0.4 ? '#ffab00' : '#00e676';
-        chart.update('none');
-    }
-}
-
-function updateAlerts(alerts) {
-    if (!alerts || alerts.length === 0) return;
-    const list = document.getElementById('alert-list');
-    list.innerHTML = '';
-    alerts.forEach(a => {
-        const div = document.createElement('div');
-        const isResolved = a.resolved || a.kind?.includes('CLEARED');
-        const isFault    = a.kind?.includes('FAULT') && !isResolved;
-        div.className = `alert-item ${isResolved ? 'resolved' : isFault ? 'fault' : 'warning'}`;
-        div.innerHTML =
-            `<span class="alert-ts">${a.timestamp}</span>  ` +
-            `<span class="alert-sw">SW-0${a.switch_id}</span>  ` +
-            `<span class="alert-kind">${a.kind}</span>  ` +
-            `<span style="color:#555">score=${(a.score ?? 0).toFixed(2)}</span>`;
-        list.appendChild(div);
+function updateCamStats(stats) {
+    stats.forEach((s, i) => {
+        const el = document.getElementById(`cam-stats-${i}`);
+        if (el) {
+            const rate = s.kbps > 0 ? `${s.kbps.toFixed(1)} KB/s` : '— KB/s';
+            el.textContent = `${s.fps.toFixed(1)} fps · ${rate}`;
+        }
     });
 }

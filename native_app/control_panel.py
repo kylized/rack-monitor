@@ -1,6 +1,6 @@
 """Main camera control panel window."""
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
@@ -42,6 +42,16 @@ class ControlPanel(QWidget):
         self._rows: list[tuple] = []
         for i in range(5):
             row = QHBoxLayout()
+
+            chk = QCheckBox()
+            chk.setChecked(False)
+            chk.setFixedWidth(20)
+            chk.setStyleSheet(
+                "QCheckBox::indicator{width:13px;height:13px;"
+                "border:1px solid #3a4a5a;background:#111418;border-radius:2px;}"
+                "QCheckBox::indicator:checked{background:#00e676;border-color:#00e676;}"
+            )
+
             dot = QLabel("●")
             dot.setStyleSheet("color:#333;font-size:11px;")
             dot.setFixedWidth(18)
@@ -53,12 +63,14 @@ class ControlPanel(QWidget):
             fps.setStyleSheet("color:#555;")
             fps.setAlignment(Qt.AlignmentFlag.AlignRight)
             fps.setFixedWidth(52)
+
+            row.addWidget(chk)
             row.addWidget(dot)
             row.addWidget(lbl)
             row.addStretch()
             row.addWidget(fps)
             root.addLayout(row)
-            self._rows.append((dot, fps, _COLORS[i]))
+            self._rows.append((chk, dot, fps, _COLORS[i]))
 
         root.addSpacing(6)
 
@@ -79,7 +91,9 @@ class ControlPanel(QWidget):
         root.addWidget(hint)
 
     def _start_all(self):
-        for cam, cap in zip(self.cameras, self.captures):
+        for (chk, dot, fps_lbl, color), cam, cap in zip(self._rows, self.cameras, self.captures):
+            if not chk.isChecked():
+                continue
             r = cam.get_region()
             cap.set_region(r["left"], r["top"], r["width"], r["height"])
             cap.start()
@@ -91,7 +105,7 @@ class ControlPanel(QWidget):
             cam.set_streaming(False)
 
     def _refresh(self):
-        for (dot, fps_lbl, color), cap in zip(self._rows, self.captures):
+        for (chk, dot, fps_lbl, color), cap in zip(self._rows, self.captures):
             if cap.running:
                 dot.setStyleSheet(f"color:{color};font-size:11px;")
                 fps_lbl.setText(f"{cap.actual_fps:.0f} fps")
