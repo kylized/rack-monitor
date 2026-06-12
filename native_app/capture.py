@@ -74,9 +74,7 @@ class CameraCapture:
             "-s", f"{w}x{h}", "-pix_fmt", "bgr24",
             "-r", str(self.fps),
             "-i", "pipe:0",
-            # Round to even dimensions (H.264 requires width/height divisible by 2).
-            # No resampling — preserves the overlay's original aspect ratio.
-            "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
+            "-vf", f"scale=1920:1080,format=yuv420p",
             "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
             "-g", str(self.fps * 2),
             "-f", "rtsp", "-rtsp_transport", "tcp",

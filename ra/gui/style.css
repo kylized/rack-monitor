@@ -101,8 +101,8 @@ body {
 }
 .cam-feed-wrap img {
     width: 220px;
-    height: auto;
-    object-fit: contain;
+    height: 124px;
+    object-fit: cover;
     border: 1px solid var(--border);
     border-radius: 2px;
     display: block;
