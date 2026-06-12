@@ -80,7 +80,7 @@ python3 -m http.server 8080
 PyQt6 application with:
 - **5 draggable camera overlay windows** — position each over a switch panel in the simulator
 - **Camera Control panel** — checkbox per camera (unchecked by default); Start All only starts checked cameras
-- Captures screen region → pushes RTSP stream via FFmpeg @ 24 fps
+- Captures screen region → pushes RTSP stream via FFmpeg @ 24 fps at the overlay's native aspect ratio (no stretching)
 
 ### Rack Analyzer (`ra/`)
 
