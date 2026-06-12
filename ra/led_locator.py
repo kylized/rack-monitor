@@ -139,12 +139,12 @@ class LedLocator:
         # Save debug images
         _save_debug(roi, dilated, cam_id)
 
-        # ── Stage 2: OCR sanity check — confirm we found the LED label strip ─────
-        # OCR is unreliable at small sizes, so we only use it as a sanity check
-        # (≥ 2 known labels in the blobs). Actual label assignment uses
-        # positional order: blobs are sorted left→right matching LED_LABELS order.
+        # ── Stage 2: OCR sanity check + anchor detection ──────────────────────
+        # OCR is unreliable at small font sizes; use it to:
+        #   a) confirm this is actually the LED label strip (≥ 2 matches)
+        #   b) find an anchor blob when blob count ≠ 6 (extra/missing blobs)
         ocr_confirmed = 0
-        ocr_log = []
+        ocr_matched: list[Optional[str]] = []   # matched label or None per blob
 
         for blob in blobs[:8]:
             pad = SCALE * 4
@@ -154,6 +154,7 @@ class LedLocator:
             cy1 = min(big.shape[0], blob['by'] + blob['bh'] + pad)
             crop_gray = gray[cy0:cy1, cx0:cx1]
             if crop_gray.size == 0:
+                ocr_matched.append(None)
                 continue
             _, crop_thresh = cv2.threshold(
                 crop_gray, 140, 255, cv2.THRESH_BINARY_INV)
@@ -163,25 +164,44 @@ class LedLocator:
                        "-c tessedit_char_whitelist=PWRSYFANTEMPOEMG"
             ).strip().upper()
             label = _best_match(raw)
-            ocr_log.append(label or raw)
+            ocr_matched.append(label)
             if label:
                 ocr_confirmed += 1
 
         logger.info("CAM-%d OCR sanity (%d/6 confirmed): %s",
-                    cam_id, ocr_confirmed, ocr_log)
+                    cam_id, ocr_confirmed, ocr_matched)
 
         if ocr_confirmed < 2:
             logger.info("CAM-%d OCR sanity check failed — not the LED strip", cam_id)
             return {}
 
-        # ── Stage 3: Positional assignment ────────────────────────────────────
-        # Label order on every switch is fixed: PWR SYS FAN TEMP POE MGMT.
-        # Use blob x-order directly — more reliable than OCR at small font sizes.
-        n = min(len(blobs), len(LED_LABELS))
+        # ── Stage 3: Positional assignment with anchor correction ─────────────
+        # Label order is fixed: PWR SYS FAN TEMP POE MGMT (left→right).
+        # When blob count == 6, assign directly by index.
+        # When count > 6 (extra noise blobs), use OCR anchor to find the true
+        # start index: if blob[bidx] OCR-matched LED_LABELS[lidx], then
+        # the PWR blob is at start = bidx - lidx.
+        start_idx = 0
+        n_blobs   = len(blobs)
+
+        if n_blobs != len(LED_LABELS):
+            for bidx, matched in enumerate(ocr_matched):
+                if matched is None:
+                    continue
+                lidx = LED_LABELS.index(matched)
+                candidate = bidx - lidx
+                if 0 <= candidate <= n_blobs - len(LED_LABELS):
+                    start_idx = candidate
+                    logger.info("CAM-%d %d blobs detected, anchor '%s' at blob %d "
+                                "→ start_idx=%d",
+                                cam_id, n_blobs, matched, bidx, start_idx)
+                    break
+
+        n     = min(n_blobs - start_idx, len(LED_LABELS))
         found: dict[str, tuple[int, int, int, int]] = {}
 
         for idx in range(n):
-            blob  = blobs[idx]
+            blob  = blobs[start_idx + idx]
             label = LED_LABELS[idx]
 
             orig_cx = blob['cx'] // SCALE
