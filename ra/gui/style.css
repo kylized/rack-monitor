@@ -57,100 +57,142 @@ body {
 .ws-dot.err { background: var(--red); }
 .ra-clock { color: var(--muted); white-space: nowrap; margin-left: auto; }
 
-/* ── Body ── */
-.ra-body {
+/* ── Filter bar ── */
+.filter-bar {
     display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.filter-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-right: 4px;
+}
+.filter-btn {
+    padding: 3px 14px;
+    border-radius: 2px;
+    border: 1px solid #252d38;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: .5px;
+    transition: all .15s;
+}
+.filter-btn:hover { border-color: #3a4a5a; color: var(--text); }
+
+.filter-btn.active                        { background: #0d1a28; border-color: var(--blue);  color: var(--blue); }
+.filter-btn.active[data-filter="NORMAL"]  { background: #0a2018; border-color: var(--green); color: var(--green); }
+.filter-btn.active[data-filter="WARNING"] { background: #201400; border-color: var(--amber); color: var(--amber); }
+.filter-btn.active[data-filter="FAULT"]   { background: #200808; border-color: var(--red);   color: var(--red); }
+
+/* ── Body / device list ── */
+.ra-body {
     flex: 1;
     min-height: 0;
     overflow: hidden;
 }
-
-/* ── Camera + LED column ── */
-.cam-led-col {
+.device-list {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    min-width: 0;
+    height: 100%;
     overflow-y: auto;
     gap: 2px;
     padding: 6px;
 }
 
-/* One row per camera */
-.cam-row {
+/* ── Device row ── */
+.device-row {
     display: flex;
     align-items: stretch;
     background: var(--bg2);
     border: 1px solid var(--border);
     border-radius: 3px;
-    overflow: hidden;
+    height: 72px;
     flex-shrink: 0;
+    transition: border-color .3s, background .3s;
 }
+.device-row.state-WARNING { border-color: #3d2200; }
+.device-row.state-FAULT   { border-color: #3d0d0d; background: #0e0a09; }
 
-/* Camera feed thumbnail */
-.cam-feed-wrap {
+/* Status indicator column */
+.dev-status-col {
+    width: 44px;
     flex-shrink: 0;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: #0d0f12;
-    padding: 4px;
-    gap: 3px;
     border-right: 1px solid var(--border);
+    align-self: stretch;
 }
-.cam-feed-wrap img {
-    width: 220px;
-    height: 124px;
-    object-fit: cover;
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    display: block;
+.dev-status-dot {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #252530;
+    transition: background .3s, box-shadow .3s;
 }
-.cam-feed-label {
-    font-size: 9px;
-    color: var(--muted);
+.dev-status-dot.NORMAL  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.dev-status-dot.WARNING { background: var(--amber); box-shadow: 0 0 8px var(--amber); animation: pulseA 1.2s infinite; }
+.dev-status-dot.FAULT   { background: var(--red);   box-shadow: 0 0 10px var(--red);  animation: pulseR .8s infinite; }
+.dev-status-dot.OFFLINE { background: #2a2a2a; }
+.dev-status-dot.UNKNOWN { background: #252530; }
+
+@keyframes pulseA {
+    0%,100% { box-shadow: 0 0 6px var(--amber); }
+    50%     { box-shadow: 0 0 16px var(--amber), 0 0 4px var(--amber); }
 }
-.cam-stats-label {
-    font-size: 8px;
-    color: var(--green);
-    opacity: 0.7;
+@keyframes pulseR {
+    0%,100% { box-shadow: 0 0 8px var(--red); }
+    50%     { box-shadow: 0 0 20px var(--red), 0 0 6px var(--red); }
 }
 
-/* LED panel */
-.led-panel {
-    flex: 1;
+/* Device info block */
+.dev-info {
+    width: 220px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 8px 14px;
-    gap: 6px;
+    gap: 3px;
+    padding: 0 14px;
+    border-right: 1px solid var(--border);
+    align-self: stretch;
 }
-
-.cam-row-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.cam-sw-label { font-size: 11px; font-weight: bold; color: #8899aa; }
+.dev-name     { font-size: 11px; font-weight: bold; color: #aabbcc; letter-spacing: .3px; }
+.dev-location { font-size: 9px; color: var(--muted); letter-spacing: .4px; }
+.dev-meta     { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.dev-ts       { font-size: 9px; color: #2e3540; }
 
 /* State badge */
 .state-badge {
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 2px;
     font-size: 9px;
     font-weight: bold;
     letter-spacing: .5px;
+    flex-shrink: 0;
 }
 .state-badge.NORMAL  { background: #0d3320; color: #66ffaa; }
 .state-badge.WARNING { background: #3a2500; color: #ffcc44; }
 .state-badge.FAULT   { background: #3a0d0d; color: #ff8888; }
 .state-badge.OFFLINE { background: #1a1a1a; color: #555; }
-.state-badge.UNKNOWN { background: #1a1a2a; color: #556; }
+.state-badge.UNKNOWN { background: #1a1a2a; color: #444; }
 
-.cam-ts { margin-left: auto; color: #2e3540; font-size: 9px; }
-
-/* LED dot row */
+/* LED section */
+.dev-led-section {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+}
 .led-dot-row {
     display: flex;
     gap: 14px;
@@ -173,7 +215,6 @@ body {
 .led-dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
 .led-dot.red   { background: var(--red);   box-shadow: 0 0 6px var(--red); }
 
-/* Blink animations */
 .led-dot.blink-green { animation: blG .8s infinite; }
 .led-dot.blink-amber { animation: blA 1s  infinite; }
 .led-dot.blink-red   { animation: blR .5s infinite; }
@@ -196,41 +237,98 @@ body {
     font-weight: bold;
     letter-spacing: .3px;
 }
-
-/* Searching placeholder */
 .led-searching {
     font-size: 9px;
     color: #2e3540;
     font-style: italic;
 }
 
-/* ── Inline status (right section of each cam row) ── */
-.cam-status {
+/* Camera live-view button */
+.dev-cam-btn {
+    width: 60px;
     flex-shrink: 0;
-    width: 160px;
-    border-left: 1px solid #2a3040;
+    align-self: stretch;
+    border: none;
+    border-left: 1px solid var(--border);
+    background: transparent;
+    color: #3a4a5a;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: .5px;
     display: flex;
     flex-direction: column;
+    align-items: center;
     justify-content: center;
     gap: 5px;
-    padding: 8px 12px;
-    transition: background .2s;
+    transition: background .15s, color .15s;
 }
-.cam-status.state-fault   { background: #110808; }
-.cam-status.state-warning { background: #100e06; }
+.dev-cam-btn:hover { background: #111e2e; color: var(--blue); }
+.cam-btn-icon { font-size: 15px; line-height: 1; }
 
-.cam-status-ocr        { font-size: 9px; color: var(--muted); }
-.cam-status-ocr.ok     { color: #2a7a48; }
-.cam-status-faults     { font-size: 9px; min-height: 16px; }
-.cam-status-fps        { font-size: 8px; color: var(--green); opacity: 0.75; }
+/* ── Camera popup ── */
+.cam-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    background: #0c1018;
+    border: 1px solid #2a3a4a;
+    border-radius: 4px;
+    box-shadow: 0 12px 48px rgba(0,0,0,.85);
+    z-index: 200;
+    overflow: hidden;
+}
+.cam-popup.hidden { display: none; }
 
-.fault-led-tag {
-    display: inline-block;
-    margin-right: 3px;
-    padding: 1px 5px;
-    border-radius: 2px;
+.cam-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: #101820;
+    border-bottom: 1px solid #1e2a38;
+    font-size: 10px;
     font-weight: bold;
+    color: #8899aa;
+    letter-spacing: .3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.fault-led-tag.red   { background: #3a0d0d; color: #ff8888; }
-.fault-led-tag.amber { background: #3a2500; color: #ffcc44; }
-.all-clear { color: #1a5a30; }
+.popup-close {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    margin-left: 10px;
+    transition: color .15s;
+}
+.popup-close:hover { color: var(--red); }
+
+.cam-popup img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 340px;
+    object-fit: contain;
+    background: #060809;
+}
+
+.cam-popup-info {
+    display: flex;
+    gap: 16px;
+    padding: 6px 14px;
+    background: #0e1318;
+    border-top: 1px solid #1e2228;
+    font-size: 9px;
+    color: var(--muted);
+}
+.cam-popup-info span { white-space: nowrap; }
+.cam-popup-info #popup-ocr.ok { color: #2a8a4a; }

@@ -20,8 +20,31 @@
     <div class="ra-clock" id="clock">--:--:--</div>
 </header>
 
+<div class="filter-bar">
+    <span class="filter-label">FILTER</span>
+    <button class="filter-btn active" data-filter="ALL"     onclick="applyFilter('ALL')">ALL</button>
+    <button class="filter-btn"        data-filter="NORMAL"  onclick="applyFilter('NORMAL')">正常</button>
+    <button class="filter-btn"        data-filter="WARNING" onclick="applyFilter('WARNING')">警告</button>
+    <button class="filter-btn"        data-filter="FAULT"   onclick="applyFilter('FAULT')">故障</button>
+    <button class="filter-btn"        data-filter="UNKNOWN" onclick="applyFilter('UNKNOWN')">未知</button>
+</div>
+
 <div class="ra-body">
-    <div class="cam-led-col" id="cam-led-col"></div>
+    <div class="device-list" id="device-list"></div>
+</div>
+
+<!-- Camera live-view popup -->
+<div class="cam-popup hidden" id="cam-popup">
+    <div class="cam-popup-header">
+        <span id="popup-title">—</span>
+        <button class="popup-close" onclick="closeCamPopup()">✕</button>
+    </div>
+    <img id="popup-stream" src="" alt="Camera feed">
+    <div class="cam-popup-info">
+        <span id="popup-ocr">—</span>
+        <span id="popup-fps">—</span>
+        <span id="popup-ts">—</span>
+    </div>
 </div>
 
 <script src="app.js"></script>

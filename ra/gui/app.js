@@ -3,6 +3,20 @@
 const NUM_CAMS = 5;
 const WS_URL   = `ws://${location.host}/ws`;
 
+// Per-camera device metadata: model name and physical location (datacenter · rack · unit).
+const DEVICE_INFO = [
+    { name: 'NetCore GS-2424P', location: 'DC-A · Rack-03 · U12' },
+    { name: 'NetCore GS-4824',  location: 'DC-A · Rack-03 · U11' },
+    { name: 'NetCore PoE-2424', location: 'DC-A · Rack-04 · U08' },
+    { name: 'NetCore GS-2424P', location: 'DC-B · Rack-01 · U04' },
+    { name: 'NetCore GS-4824',  location: 'DC-B · Rack-01 · U03' },
+];
+
+// Runtime state caches (updated on every WS tick; read by popup on open).
+let _activeFilter = 'ALL';
+let _switches     = [];
+let _camStats     = [];
+
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,36 +37,98 @@ function startClock() {
 // ── Build initial DOM ─────────────────────────────────────────────────────────
 
 function buildRows() {
-    const col = document.getElementById('cam-led-col');
+    const list = document.getElementById('device-list');
     for (let i = 0; i < NUM_CAMS; i++) {
-        const row = document.createElement('div');
-        row.className = 'cam-row';
-        row.id = `cam-row-${i}`;
+        const info = DEVICE_INFO[i];
+        const row  = document.createElement('div');
+        row.className   = 'device-row';
+        row.id          = `row-${i}`;
+        row.dataset.state = 'UNKNOWN';
         row.innerHTML = `
-            <div class="cam-feed-wrap">
-                <img src="/api/stream/${i}" alt="CAM-${i}">
-                <div class="cam-feed-label">CAM-${i} → SW-0${i + 1}</div>
-                <div class="cam-stats-label" id="cam-stats-${i}">— fps · — KB/s</div>
+            <div class="dev-status-col">
+                <div class="dev-status-dot" id="sdot-${i}"></div>
             </div>
-            <div class="led-panel" id="led-panel-${i}">
-                <div class="cam-row-header">
-                    <span class="cam-sw-label">SW-0${i + 1}</span>
+            <div class="dev-info">
+                <div class="dev-name">${info.name}</div>
+                <div class="dev-location">${info.location}</div>
+                <div class="dev-meta">
                     <span class="state-badge UNKNOWN" id="badge-${i}">UNKNOWN</span>
-                    <span class="cam-ts" id="ts-${i}">—</span>
+                    <span class="dev-ts" id="ts-${i}">—</span>
                 </div>
+            </div>
+            <div class="dev-led-section">
                 <div class="led-dot-row" id="led-row-${i}">
                     <span class="led-searching">OCR 校準中…</span>
                 </div>
             </div>
-            <div class="cam-status" id="cam-status-${i}">
-                <div class="cam-status-ocr" id="socr-${i}">Searching…</div>
-                <div class="cam-status-faults" id="sfaults-${i}"></div>
-                <div class="cam-status-fps" id="sfps-${i}">— fps · — KB/s</div>
-            </div>`;
-        col.appendChild(row);
+            <button class="dev-cam-btn" onclick="openCamPopup(${i})" title="查看即時影像">
+                <span class="cam-btn-icon">▶</span>
+                <span>LIVE</span>
+            </button>`;
+        list.appendChild(row);
     }
 }
 
+// ── Filter ────────────────────────────────────────────────────────────────────
+
+function applyFilter(state) {
+    _activeFilter = state;
+
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === state);
+    });
+
+    for (let i = 0; i < NUM_CAMS; i++) {
+        const row      = document.getElementById(`row-${i}`);
+        if (!row) continue;
+        const rowState = row.dataset.state || 'UNKNOWN';
+        row.style.display = (state === 'ALL' || rowState === state) ? '' : 'none';
+    }
+}
+
+// ── Camera popup ──────────────────────────────────────────────────────────────
+
+function openCamPopup(camId) {
+    const popup  = document.getElementById('cam-popup');
+    const info   = DEVICE_INFO[camId];
+    const sw     = _switches[camId];
+    const cs     = _camStats[camId] || { fps: 0, kbps: 0 };
+
+    document.getElementById('popup-title').textContent =
+        `CAM-${camId}  ·  ${info.name}  ·  ${info.location}`;
+
+    // Setting src triggers the MJPEG connection.
+    document.getElementById('popup-stream').src = `/api/stream/${camId}`;
+
+    _updatePopupInfo(sw, cs);
+
+    popup.dataset.camId = camId;
+    popup.classList.remove('hidden');
+}
+
+function closeCamPopup() {
+    const popup  = document.getElementById('cam-popup');
+    document.getElementById('popup-stream').src = '';   // stop MJPEG
+    popup.classList.add('hidden');
+}
+
+function _updatePopupInfo(sw, cs) {
+    const locStatus = sw ? (sw.locator_status || 'searching') : 'searching';
+    const ocrEl     = document.getElementById('popup-ocr');
+
+    if (locStatus === 'calibrated') {
+        ocrEl.textContent = `OCR ${(sw.detected_labels || []).length}/6 ✓`;
+        ocrEl.className   = 'ok';
+    } else {
+        ocrEl.textContent = 'OCR 校準中…';
+        ocrEl.className   = '';
+    }
+
+    document.getElementById('popup-fps').textContent =
+        `${(cs.fps || 0).toFixed(1)} fps · ${cs.kbps > 0 ? cs.kbps.toFixed(1) + ' KB/s' : '—'}`;
+    document.getElementById('popup-ts').textContent =
+        sw ? (sw.timestamp || '—') : '—';
+}
 
 // ── LED row rendering ─────────────────────────────────────────────────────────
 
@@ -69,73 +145,24 @@ function renderLedRow(camId, sw) {
     }
 
     row.innerHTML = labels.map(label => {
-        const raw    = ledsDict[label] || 'off';
-        const cls    = ledClass(raw);
-        return `
-            <div class="led-item">
-                <div class="led-dot ${cls}" id="led-${camId}-${label}"></div>
-                <div class="led-label">${label}</div>
-            </div>`;
+        const raw = ledsDict[label] || 'off';
+        const cls = ledClass(raw);
+        return `<div class="led-item">
+            <div class="led-dot ${cls}"></div>
+            <div class="led-label">${label}</div>
+        </div>`;
     }).join('');
 }
 
 function ledClass(color) {
-    if (!color || color === 'off') return 'off';
-    if (color === 'green') return 'green';
-    if (color === 'amber') return 'amber';
-    if (color === 'red')   return 'red';
-    if (color.startsWith('blink-green')) return 'blink-green';
-    if (color.startsWith('blink-amber')) return 'blink-amber';
-    if (color.startsWith('blink-red'))   return 'blink-red';
+    if (!color || color === 'off')             return 'off';
+    if (color === 'green')                     return 'green';
+    if (color === 'amber')                     return 'amber';
+    if (color === 'red')                       return 'red';
+    if (color.startsWith('blink-green'))       return 'blink-green';
+    if (color.startsWith('blink-amber'))       return 'blink-amber';
+    if (color.startsWith('blink-red'))         return 'blink-red';
     return 'off';
-}
-
-// ── Inline status rendering ───────────────────────────────────────────────────
-
-function renderStatusCard(camId, sw, fps, kbps) {
-    const wrap    = document.getElementById(`cam-status-${camId}`);
-    const socr    = document.getElementById(`socr-${camId}`);
-    const sfaults = document.getElementById(`sfaults-${camId}`);
-    const sfps    = document.getElementById(`sfps-${camId}`);
-    if (!wrap) return;
-
-    const state  = sw.state || 'UNKNOWN';
-    const labels = sw.detected_labels || [];
-    const leds   = sw.leds || {};
-
-    wrap.className = `cam-status state-${state.toLowerCase()}`;
-
-    // OCR status
-    const locStatus = sw.locator_status || 'searching';
-    if (locStatus === 'calibrated') {
-        socr.textContent = `OCR ${labels.length}/6`;
-        socr.className   = 'cam-status-ocr ok';
-    } else if (locStatus === 'fallback') {
-        socr.textContent = 'Fallback';
-        socr.className   = 'cam-status-ocr';
-    } else {
-        socr.textContent = 'Searching…';
-        socr.className   = 'cam-status-ocr';
-    }
-
-    // Fault LED tags
-    const faultItems = labels
-        .map(label => {
-            const raw = (leds[label] || 'off').replace('blink-', '');
-            if (raw === 'red' || raw === 'amber') {
-                return `<span class="fault-led-tag ${raw}">${label}</span>`;
-            }
-            return null;
-        })
-        .filter(Boolean);
-
-    sfaults.innerHTML = faultItems.length
-        ? faultItems.join('')
-        : (state === 'NORMAL' ? '<span class="all-clear">All clear</span>' : '');
-
-    // FPS / KB/s
-    const rateStr = kbps > 0 ? `${kbps.toFixed(1)} KB/s` : '—';
-    sfps.textContent = `${(fps || 0).toFixed(1)} fps · ${rateStr}`;
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────
@@ -153,7 +180,7 @@ function connectWS() {
         const msg = JSON.parse(data);
         if (msg.summary)   updateSummary(msg.summary);
         if (msg.switches)  updateSwitches(msg.switches, msg.cam_stats || []);
-        if (msg.cam_stats) updateCamStats(msg.cam_stats);
+        if (msg.cam_stats) _camStats = msg.cam_stats;
     };
 
     ws.onclose = () => { dot.className = 'ws-dot err'; setTimeout(connectWS, 3000); };
@@ -168,34 +195,38 @@ function updateSummary(s) {
 }
 
 function updateSwitches(switches, camStats) {
+    _switches = switches;
+
     switches.forEach(sw => {
         if (!sw) return;
-        const i = sw.cam_id;
+        const i     = sw.cam_id;
+        const state = sw.state || 'UNKNOWN';
 
-        // Badge + timestamp
-        const badge = document.getElementById(`badge-${i}`);
-        if (badge) {
-            badge.textContent = sw.state || 'UNKNOWN';
-            badge.className   = `state-badge ${sw.state || 'UNKNOWN'}`;
+        // Row: state class + filter visibility
+        const row = document.getElementById(`row-${i}`);
+        if (row) {
+            row.dataset.state = state;
+            row.className     = `device-row state-${state}`;
+            row.style.display = (_activeFilter === 'ALL' || _activeFilter === state) ? '' : 'none';
         }
+
+        // Status dot
+        const sdot = document.getElementById(`sdot-${i}`);
+        if (sdot) sdot.className = `dev-status-dot ${state}`;
+
+        // State badge + timestamp
+        const badge = document.getElementById(`badge-${i}`);
+        if (badge) { badge.textContent = state; badge.className = `state-badge ${state}`; }
         const ts = document.getElementById(`ts-${i}`);
         if (ts) ts.textContent = sw.timestamp || '—';
 
-        // LED row
+        // LED dots
         renderLedRow(i, sw);
 
-        // Status card
-        const cs = camStats[i] || { fps: 0, kbps: 0 };
-        renderStatusCard(i, sw, cs.fps, cs.kbps);
-    });
-}
-
-function updateCamStats(stats) {
-    stats.forEach((s, i) => {
-        const el = document.getElementById(`cam-stats-${i}`);
-        if (el) {
-            const rate = s.kbps > 0 ? `${s.kbps.toFixed(1)} KB/s` : '— KB/s';
-            el.textContent = `${s.fps.toFixed(1)} fps · ${rate}`;
+        // Keep popup live if it's open for this camera
+        const popup = document.getElementById('cam-popup');
+        if (!popup.classList.contains('hidden') && Number(popup.dataset.camId) === i) {
+            _updatePopupInfo(sw, camStats[i] || { fps: 0, kbps: 0 });
         }
     });
 }
