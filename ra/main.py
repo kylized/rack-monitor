@@ -146,11 +146,11 @@ async def ws_endpoint(ws: WebSocket):
 
         async def receiver():
             while True:
-                await ws.receive_text()   # absorb keep-alive pings
+                await ws.receive()   # absorb any message type (text or binary pings)
 
         await asyncio.gather(sender(), receiver())
-    except (WebSocketDisconnect, Exception):
-        pass
+    except (WebSocketDisconnect, Exception) as e:
+        logger.warning("WS closed: %s %s", type(e).__name__, e)
     finally:
         _client_queues.discard(q)
 
