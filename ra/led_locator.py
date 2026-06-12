@@ -137,58 +137,71 @@ class LedLocator:
             return {}
 
         # Save debug images
-        _save_debug(roi, dilated[y0b:y1b, :], cam_id)
+        _save_debug(roi, dilated, cam_id)
 
-        # ── Stage 2: OCR each blob individually (PSM 8 = single word) ─────────
-        found: dict[str, tuple[int, int, int, int]] = {}
-        ocr_results = []
+        # ── Stage 2: OCR sanity check — confirm we found the LED label strip ─────
+        # OCR is unreliable at small sizes, so we only use it as a sanity check
+        # (≥ 2 known labels in the blobs). Actual label assignment uses
+        # positional order: blobs are sorted left→right matching LED_LABELS order.
+        ocr_confirmed = 0
+        ocr_log = []
 
         for blob in blobs[:8]:
             pad = SCALE * 4
-            cx0 = max(0,           blob['bx'] - pad)
+            cx0 = max(0,            blob['bx'] - pad)
             cx1 = min(big.shape[1], blob['bx'] + blob['bw'] + pad)
-            cy0 = max(0,           blob['by'] - pad)
+            cy0 = max(0,            blob['by'] - pad)
             cy1 = min(big.shape[0], blob['by'] + blob['bh'] + pad)
-
             crop_gray = gray[cy0:cy1, cx0:cx1]
             if crop_gray.size == 0:
                 continue
-
-            # Invert so tesseract sees dark text on white background
             _, crop_thresh = cv2.threshold(
                 crop_gray, 140, 255, cv2.THRESH_BINARY_INV)
-
             raw = pytesseract.image_to_string(
                 crop_thresh,
                 config="--psm 8 --oem 3 "
                        "-c tessedit_char_whitelist=PWRSYFANTEMPOEMG"
             ).strip().upper()
-
-            # Accept exact label or close enough (≥3 chars overlap)
             label = _best_match(raw)
-            ocr_results.append((label or raw, blob['cx'], blob['cy']))
+            ocr_log.append(label or raw)
+            if label:
+                ocr_confirmed += 1
 
-            if label and label not in found:
-                # Convert scaled blob centre back to original frame coords
-                orig_cx = blob['cx'] // SCALE
-                orig_cy = blob['cy'] // SCALE + roi_y0
-                orig_h  = max(1, blob['bh'] // SCALE)
+        logger.info("CAM-%d OCR sanity (%d/6 confirmed): %s",
+                    cam_id, ocr_confirmed, ocr_log)
 
-                px_per_css = orig_h / _LABEL_H_CSS
-                dot_r  = max(5, int(_DOT_D_CSS * px_per_css / 2))
-                gap_px = max(2, int(_GAP_CSS   * px_per_css))
-                pad_r  = max(4, dot_r // 2)
+        if ocr_confirmed < 2:
+            logger.info("CAM-%d OCR sanity check failed — not the LED strip", cam_id)
+            return {}
 
-                dot_cx = orig_cx
-                dot_cy = orig_cy - gap_px - dot_r
+        # ── Stage 3: Positional assignment ────────────────────────────────────
+        # Label order on every switch is fixed: PWR SYS FAN TEMP POE MGMT.
+        # Use blob x-order directly — more reliable than OCR at small font sizes.
+        n = min(len(blobs), len(LED_LABELS))
+        found: dict[str, tuple[int, int, int, int]] = {}
 
-                if dot_cy >= 0:
-                    found[label] = (
-                        dot_cx - dot_r - pad_r, dot_cy - dot_r - pad_r,
-                        dot_cx + dot_r + pad_r, dot_cy + dot_r + pad_r,
-                    )
+        for idx in range(n):
+            blob  = blobs[idx]
+            label = LED_LABELS[idx]
 
-        logger.info("CAM-%d blob OCR results: %s", cam_id, ocr_results)
+            orig_cx = blob['cx'] // SCALE
+            orig_cy = blob['cy'] // SCALE + roi_y0
+            orig_h  = max(1, blob['bh'] // SCALE)
+
+            px_per_css = orig_h / _LABEL_H_CSS
+            dot_r  = max(5, int(_DOT_D_CSS * px_per_css / 2))
+            gap_px = max(2, int(_GAP_CSS   * px_per_css))
+            pad_r  = max(4, dot_r // 2)
+
+            dot_cx = orig_cx
+            dot_cy = orig_cy - gap_px - dot_r
+
+            if dot_cy >= 0:
+                found[label] = (
+                    dot_cx - dot_r - pad_r, dot_cy - dot_r - pad_r,
+                    dot_cx + dot_r + pad_r, dot_cy + dot_r + pad_r,
+                )
+
         return found
 
 
