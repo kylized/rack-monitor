@@ -208,7 +208,7 @@ body {
 .cam-status {
     flex-shrink: 0;
     width: 160px;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid #2a3040;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -219,10 +219,10 @@ body {
 .cam-status.state-fault   { background: #110808; }
 .cam-status.state-warning { background: #100e06; }
 
-.cam-status-ocr        { font-size: 9px; color: #2e3540; }
-.cam-status-ocr.ok     { color: #1a5a30; }
+.cam-status-ocr        { font-size: 9px; color: var(--muted); }
+.cam-status-ocr.ok     { color: #2a7a48; }
 .cam-status-faults     { font-size: 9px; min-height: 16px; }
-.cam-status-fps        { font-size: 8px; color: var(--green); opacity: 0.6; }
+.cam-status-fps        { font-size: 8px; color: var(--green); opacity: 0.75; }
 
 .fault-led-tag {
     display: inline-block;
