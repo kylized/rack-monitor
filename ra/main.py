@@ -1,4 +1,16 @@
-"""Rack Analyzer — FastAPI backend (port 5001)."""
+"""
+Rack Analyzer — FastAPI backend (port 5001).
+
+Endpoints:
+  GET  /                          dashboard (static HTML/JS/CSS)
+  WS   /ws                        live switch states, LED colours, cam stats (1 s tick)
+  GET  /api/stream/{cam_id}       MJPEG stream (multipart/x-mixed-replace)
+  GET  /api/switches              current SwitchState list (JSON)
+  GET  /api/summary               normal/warning/fault/unknown counts
+  GET  /api/alerts                recent alert ring buffer
+  GET  /api/history/{switch_id}   rolling LED history
+  GET  /api/debug/ocr/{cam_id}/roi|thresh  OCR debug images saved by LedLocator
+"""
 
 import asyncio
 import json

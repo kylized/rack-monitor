@@ -88,31 +88,34 @@ FastAPI backend at `http://localhost:5001`.
 
 **LED Detection Pipeline:**
 1. RTSP frames ingested from mediamtx (5 fps analysis rate)
-2. `LedLocator` runs a two-stage OCR pipeline per camera:
-   - Stage 1: find white text blobs via horizontal projection + connected-component dilation
-   - Stage 2: tesseract PSM-8 (single word) on each individual blob crop
-3. LED dots located relative to their label text bounding boxes
-4. Colour detection + blink history → switch state (`NORMAL / WARNING / FAULT`)
-5. Results broadcast via WebSocket to dashboard (1 s interval)
+2. `LedLocator` runs a three-stage pipeline per camera (cached after first calibration):
+   - Stage 1: upscale frame, white-pixel threshold, horizontal projection to find label row, dilation to isolate per-label blobs
+   - Stage 2: tesseract PSM-8 sanity check — confirms ≥ 2 known labels are present; uses OCR anchor to correct for extra noise blobs
+   - Stage 3: positional assignment — blobs sorted left→right map to `PWR SYS FAN TEMP POE MGMT`
+3. Each LED dot box is derived from its label's text bounding box + CSS geometry constants
+4. HSV colour detection per dot + rolling blink history → `NORMAL / WARNING / FAULT / OFFLINE`
+5. Results broadcast via WebSocket to dashboard every 1 s
 
 **API endpoints:**
 
 | Endpoint | Description |
 |---|---|
 | `GET /` | RA dashboard |
-| `WS /ws` | Live switch states + LED data + cam stats |
-| `GET /api/stream/{cam_id}` | MJPEG stream (multipart) |
-| `GET /api/debug/ocr/{cam_id}/roi` | OCR region-of-interest debug image |
-| `GET /api/debug/ocr/{cam_id}/thresh` | OCR threshold debug image |
+| `WS /ws` | Live switch states + LED colours + cam stats (1 s tick) |
+| `GET /api/stream/{cam_id}` | MJPEG stream (multipart/x-mixed-replace) |
+| `GET /api/debug/ocr/{cam_id}/roi` | Label-strip ROI debug image |
+| `GET /api/debug/ocr/{cam_id}/thresh` | Dilated blob mask debug image |
 | `GET /api/switches` | Current switch states (JSON) |
-| `GET /api/alerts` | Recent alerts |
-| `GET /api/history/{switch_id}` | Time-series history |
+| `GET /api/alerts` | Recent alert ring buffer |
+| `GET /api/history/{switch_id}` | Rolling LED history |
 
-**RA Dashboard features:**
-- Vertically stacked camera rows: live MJPEG feed + LED panel side-by-side
-- LED labels rendered dynamically from OCR results (`detected_labels`) — never hardcoded
-- Status column (right side): OCR calibration status, fault LEDs, fps/KB/s
-- Shows "OCR 校準中…" until calibration succeeds (≥ 4 labels detected)
+**RA Dashboard layout (per camera row):**
+```
+[MJPEG feed]  |  [SW-0X  STATE  timestamp  ·  LED dots]  |  [OCR N/6  fault tags  fps · KB/s]
+```
+- LED labels rendered dynamically from `detected_labels` (OCR results) — never hardcoded
+- Shows "OCR 校準中…" until ≥ 4 labels are detected; updates live as OCR calibrates
+- After RA restart, open a fresh tab or press **Cmd+Shift+R** to clear the browser cache
 
 ### MediaMTX (`mediamtx/`)
 

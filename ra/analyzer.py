@@ -1,13 +1,16 @@
 """
-CV frame analysis pipeline:
+Per-frame LED analysis pipeline:
 
-  1. LedLocator  — OCR finds label text → derives exact LED dot crop box
-  2. _dominant_color — HSV colour detection on the precise crop
-  3. StateStore.record_led / is_blinking — blink detection across frames
-  4. _derive_state / _anomaly_score — rules-based status
+  1. LedLocator.get()     — returns {label: (x0,y0,x1,y1)} from cached OCR,
+                            or None while still calibrating.
+  2. _detect_leds_precise — crops each LED dot box, runs HSV colour detection.
+  3. _apply_blink         — promotes solid colours to blink-* when the LED
+                            history shows on/off alternation.
+  4. _derive_state        — OFFLINE if PWR off; FAULT if any red; WARNING if
+                            any amber; otherwise NORMAL.
 
-Fallback: if LedLocator cannot detect labels (< 4 found), the old
-percentage-based region split is used so the system still produces output.
+Fallback: if LedLocator has not yet calibrated, _detect_leds_fallback splits
+the frame by fixed percentages so the system still produces output.
 """
 
 from datetime import datetime

@@ -1,15 +1,21 @@
 """
-LED locator — two-stage pipeline:
+LED locator — three-stage pipeline:
 
-  Stage 1 (Geometry)  : find white-text blobs in the frame, sort left→right
-                        to locate each label's pixel position reliably.
-  Stage 2 (Identity)  : run tesseract PSM-8 (single-word) on each individual
-                        blob crop to read the actual label name dynamically.
+  Stage 1 (Blob detection) : upscale frame, threshold for white pixels,
+                             find the horizontal band with the most white
+                             text, dilate horizontally to isolate per-label
+                             blobs, sort left→right.
 
-Simulator CSS (updated to white #ffffff, 9 px font):
-    .led-group { flex-direction:column; align-items:center; gap:4px }
-    .led-dot   { width:11px; height:11px; border-radius:50% }
-    .led-name  { font-size:9px; color:#ffffff }
+  Stage 2 (OCR sanity)     : run tesseract PSM-8 on each blob crop to
+                             confirm ≥ 2 known labels are present, proving
+                             this is actually the LED label strip.  Also
+                             detects the anchor blob when extra noise blobs
+                             shift the count away from 6.
+
+  Stage 3 (Positional)     : assign labels by left→right order, which is
+                             always PWR SYS FAN TEMP POE MGMT on every
+                             switch.  Derive each LED dot's bounding box
+                             from the label text position + CSS geometry.
 """
 
 import logging

@@ -1,4 +1,4 @@
-"""Rule-based time-series analyzer (Phase-1). Phase-2 LSTM slot is here."""
+"""Rule-based time-series analyzer: fires alerts after sustained FAULT/WARNING."""
 
 import threading
 from state_store import SwitchState, Alert, StateStore
