@@ -7,7 +7,6 @@ const WS_URL   = `ws://${location.host}/ws`;
 
 document.addEventListener('DOMContentLoaded', () => {
     buildRows();
-    buildStatusCards();
     startClock();
     connectWS();
 });
@@ -44,30 +43,16 @@ function buildRows() {
                 <div class="led-dot-row" id="led-row-${i}">
                     <span class="led-searching">OCR 校準中…</span>
                 </div>
+            </div>
+            <div class="cam-status" id="cam-status-${i}">
+                <div class="cam-status-ocr" id="socr-${i}">Searching…</div>
+                <div class="cam-status-faults" id="sfaults-${i}"></div>
+                <div class="cam-status-fps" id="sfps-${i}">— fps · — KB/s</div>
             </div>`;
         col.appendChild(row);
     }
 }
 
-function buildStatusCards() {
-    const col = document.getElementById('status-col');
-    col.innerHTML = `<div class="status-col-title">Analysis Status</div>`;
-    for (let i = 0; i < NUM_CAMS; i++) {
-        const card = document.createElement('div');
-        card.className = 'status-card';
-        card.id = `status-card-${i}`;
-        card.innerHTML = `
-            <div class="status-card-header">
-                <div class="status-state-dot UNKNOWN" id="sdot-${i}"></div>
-                <span>CAM-${i} · SW-0${i + 1}</span>
-            </div>
-            <div class="status-ocr" id="socr-${i}">Searching…</div>
-            <div class="status-faults" id="sfaults-${i}"></div>
-            <div class="status-fps" id="sfps-${i}">— fps · — KB/s</div>
-            <div class="status-ts" id="sts-${i}">—</div>`;
-        col.appendChild(card);
-    }
-}
 
 // ── LED row rendering ─────────────────────────────────────────────────────────
 
@@ -105,41 +90,35 @@ function ledClass(color) {
     return 'off';
 }
 
-// ── Status card rendering ─────────────────────────────────────────────────────
+// ── Inline status rendering ───────────────────────────────────────────────────
 
 function renderStatusCard(camId, sw, fps, kbps) {
-    const card    = document.getElementById(`status-card-${camId}`);
-    const sdot    = document.getElementById(`sdot-${camId}`);
+    const wrap    = document.getElementById(`cam-status-${camId}`);
     const socr    = document.getElementById(`socr-${camId}`);
     const sfaults = document.getElementById(`sfaults-${camId}`);
     const sfps    = document.getElementById(`sfps-${camId}`);
-    const sts     = document.getElementById(`sts-${camId}`);
-    if (!card) return;
+    if (!wrap) return;
 
     const state  = sw.state || 'UNKNOWN';
     const labels = sw.detected_labels || [];
     const leds   = sw.leds || {};
 
-    // Card background class
-    card.className = `status-card state-${state.toLowerCase()}`;
-
-    // State dot
-    sdot.className = `status-state-dot ${state}`;
+    wrap.className = `cam-status state-${state.toLowerCase()}`;
 
     // OCR status
     const locStatus = sw.locator_status || 'searching';
     if (locStatus === 'calibrated') {
-        socr.textContent = `OCR: ${labels.length}/6 labels`;
-        socr.className   = 'status-ocr ok';
+        socr.textContent = `OCR ${labels.length}/6`;
+        socr.className   = 'cam-status-ocr ok';
     } else if (locStatus === 'fallback') {
-        socr.textContent = 'Fallback mode (OCR n/a)';
-        socr.className   = 'status-ocr';
+        socr.textContent = 'Fallback';
+        socr.className   = 'cam-status-ocr';
     } else {
-        socr.textContent = 'Searching for labels…';
-        socr.className   = 'status-ocr';
+        socr.textContent = 'Searching…';
+        socr.className   = 'cam-status-ocr';
     }
 
-    // Fault LEDs
+    // Fault LED tags
     const faultItems = labels
         .map(label => {
             const raw = (leds[label] || 'off').replace('blink-', '');
@@ -152,14 +131,11 @@ function renderStatusCard(camId, sw, fps, kbps) {
 
     sfaults.innerHTML = faultItems.length
         ? faultItems.join('')
-        : (state === 'NORMAL' ? '<span style="color:#1a5a30">All clear</span>' : '');
+        : (state === 'NORMAL' ? '<span class="all-clear">All clear</span>' : '');
 
     // FPS / KB/s
-    const rateStr = kbps > 0 ? `${kbps.toFixed(1)} KB/s` : '— KB/s';
+    const rateStr = kbps > 0 ? `${kbps.toFixed(1)} KB/s` : '—';
     sfps.textContent = `${(fps || 0).toFixed(1)} fps · ${rateStr}`;
-
-    // Timestamp
-    sts.textContent = sw.timestamp || '—';
 }
 
 // ── WebSocket ─────────────────────────────────────────────────────────────────

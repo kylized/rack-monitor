@@ -204,67 +204,33 @@ body {
     font-style: italic;
 }
 
-/* ── Status column ── */
-.status-col {
-    width: 220px;
+/* ── Inline status (right section of each cam row) ── */
+.cam-status {
     flex-shrink: 0;
+    width: 160px;
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
-    background: var(--bg2);
-}
-
-.status-col-title {
-    padding: 8px 10px;
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: var(--muted);
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-}
-
-.status-card {
-    border-bottom: 1px solid var(--border);
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 12px;
     transition: background .2s;
 }
-.status-card.state-fault   { background: #150a0a; }
-.status-card.state-warning { background: #13100a; }
-.status-card.state-normal  { background: var(--bg2); }
+.cam-status.state-fault   { background: #110808; }
+.cam-status.state-warning { background: #100e06; }
 
-.status-card-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: bold;
-    font-size: 10px;
-    color: #8899aa;
-}
-.status-state-dot {
-    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
-}
-.status-state-dot.NORMAL  { background: var(--green); box-shadow: 0 0 3px var(--green); }
-.status-state-dot.WARNING { background: var(--amber); box-shadow: 0 0 3px var(--amber); }
-.status-state-dot.FAULT   { background: var(--red);   box-shadow: 0 0 3px var(--red); }
-.status-state-dot.OFFLINE { background: #333; }
-.status-state-dot.UNKNOWN { background: #333; }
+.cam-status-ocr        { font-size: 9px; color: #2e3540; }
+.cam-status-ocr.ok     { color: #1a5a30; }
+.cam-status-faults     { font-size: 9px; min-height: 16px; }
+.cam-status-fps        { font-size: 8px; color: var(--green); opacity: 0.6; }
 
-.status-ocr   { font-size: 9px; color: #2e3540; }
-.status-ocr.ok { color: #1a5a30; }
-.status-faults { font-size: 9px; }
 .fault-led-tag {
     display: inline-block;
-    margin-right: 4px;
+    margin-right: 3px;
     padding: 1px 5px;
     border-radius: 2px;
     font-weight: bold;
 }
 .fault-led-tag.red   { background: #3a0d0d; color: #ff8888; }
 .fault-led-tag.amber { background: #3a2500; color: #ffcc44; }
-.status-ts { font-size: 9px; color: #2e3540; margin-top: 2px; }
-.status-fps { font-size: 8px; color: var(--green); opacity: 0.6; }
+.all-clear { color: #1a5a30; }
